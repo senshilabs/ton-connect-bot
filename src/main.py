@@ -10,7 +10,7 @@ from pytoniq_core import Address
 from pytonconnect import TonConnect
 
 import config
-from messages import get_comment_message
+from messages import get_comment_message, get_pay_message
 from connector import get_connector
 
 from aiogram import Bot, Dispatcher, F
@@ -23,7 +23,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 logger = logging.getLogger(__file__)
 
 dp = Dispatcher()
-bot = Bot(config.TOKEN, parse_mode=ParseMode.HTML)
+
+bot = Bot(config.TOKEN)
+
+
 
 
 @dp.message(CommandStart())
@@ -61,6 +64,45 @@ async def send_transaction(message: Message):
                 destination_address='0:0000000000000000000000000000000000000000000000000000000000000000',
                 amount=int(0.01 * 10 ** 9),
                 comment='hello world!'
+            )
+        ]
+    }
+
+    await message.answer(text='Approve transaction in your wallet app!')
+    try:
+        await asyncio.wait_for(connector.send_transaction(
+            transaction=transaction
+        ), 300)
+    except asyncio.TimeoutError:
+        await message.answer(text='Timeout error!')
+    except pytonconnect.exceptions.UserRejectsError:
+        await message.answer(text='You rejected the transaction!')
+    except Exception as e:
+        await message.answer(text=f'Unknown error: {e}')
+
+@dp.message(Command('pay'))
+async def send_transaction(message: Message):
+    connector = get_connector(message.chat.id)
+    connected = await connector.restore_connection()
+    if not connected:
+        await message.answer('Connect wallet first!')
+        return
+    text = message.text
+    params = text.replace("/pay","").strip().split(' ')
+    if len(params) != 2:
+        await message.answer('Usage: /pay <channel_id> <item_id>')
+        return
+    
+    channel_id = int(params[0])
+    item_id = int(params[1])
+    transaction = {
+        'valid_until': int(time.time() + 3600),
+        'messages': [
+            get_pay_message(
+                destination_address=config.CONTRACT_ADDRESS,
+                amount=int(1 * 10 ** 9),
+                channel_id=int(channel_id),
+                item_id=int(item_id)
             )
         ]
     }

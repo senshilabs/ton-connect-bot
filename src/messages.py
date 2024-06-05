@@ -19,3 +19,19 @@ def get_comment_message(destination_address: str, amount: int, comment: str) -> 
     }
 
     return data
+
+def get_pay_message(destination_address: str, amount: int, channel_id : int, item_id: int) -> dict:
+    data = {
+        'address': destination_address,
+        'amount': str(amount),
+        'payload': urlsafe_b64encode(
+            begin_cell()
+            .store_uint(1297589487, 32)  # unique operation code
+            .store_int(channel_id, 257)  # store channelId as int
+            .store_uint(item_id, 256)  # store itemId as uint
+            .end_cell()  # end cell
+            .to_boc()  # convert it to boc
+        )
+        .decode()  # encode it to urlsafe base64
+    }
+    return data
